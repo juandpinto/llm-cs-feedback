@@ -7,7 +7,7 @@ from datetime import datetime
 df = pd.read_excel('task_submit_deidentified.xlsx')
 
 # Slice the dataframe while testing to keep costs low
-df = df.iloc[:3]
+df = df.iloc[:10]
 
 
 # %%
@@ -30,10 +30,15 @@ results_df = pd.DataFrame(
 for i, row in df.iterrows():
     print(f"{i+1}/{len(df)}")
 
+    history = df[(df['user_id'] == row['user_id']) & (df['task_id'] == row['task_id']) & (df['upload_date'] < row['upload_date'])]
+    if len(history) == 0:
+        history = None
+
     # Make the API call
     response, prompt = make_api_call(
         row,
         model = "gpt-3.5-turbo-0125",
+        history = history,
         key = keys.api_key,
         api_seed = 42,
         language = "English",
@@ -69,5 +74,10 @@ for i, row in df.iterrows():
             "response_usage_total_tokens": "int",
         }
     )
+
+# Save temp results to temp CSV
+results_df.to_csv(
+    f"results/temp/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv", index=False
+)
 
 # %%

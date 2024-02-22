@@ -6,7 +6,7 @@ from prompt_templates import prompt_templates
 
 # Extract and format student code
 def get_code(instance, codeLanguage="C#"):
-    studentCode = f"\n# Student code\n\n```{codeLanguage}\n"
+    studentCode = f"\n## Student code\n\n```{codeLanguage}\n"
     studentCode += instance['file_content']
     studentCode += "\n```\n\n"
 
@@ -17,7 +17,7 @@ def get_code(instance, codeLanguage="C#"):
 def get_errors(instance):
     errorList = json.loads(instance['error_list'])
 
-    errors = "# Errors\n"
+    errors = "## Errors\n"
     for index, item in enumerate(errorList):
         errors += f"\n- {item['type']} `{item['id']}` on line `{item['line']}` with the following message: `{item['message']}`"
 
@@ -28,9 +28,27 @@ def get_errors(instance):
     return errors
 
 
+def get_history(history, codeLanguage="C#"):
+    prompt_history = prompt_templates['history']
+
+    history = history.sort_values(by="upload_date")
+    for i, row in history.iterrows():
+        prompt_history += f"\n## Submission on {row['upload_date']}"
+        prompt_history += get_code(row, codeLanguage=codeLanguage)
+        prompt_history += get_errors(row)
+
+    return prompt_history
+
+
 # Create the full prompt for a single instance
-def create_prompt(instance, language="English", codeLanguage="C#"):
+def create_prompt(instance, history=None, language="English", codeLanguage="C#"):
     prompt = prompt_templates['header'].format(language=language)
+
+    if history is not None:
+        prompt += "\n\n"
+        prompt += get_history(history, codeLanguage=codeLanguage)
+
+    prompt += "\n\n# Latest submission for feedback\n"
     prompt += get_code(instance, codeLanguage=codeLanguage)
     prompt += get_errors(instance)
 
@@ -65,6 +83,7 @@ def query_openai(model, prompt, client, language="English", codeLanguage="C#", *
 
 def make_api_call(
     instance,
+    history=None,
     model = "gpt-4-0125-preview",
     key:str = "",
     api_seed: int = 42,
@@ -80,7 +99,7 @@ def make_api_call(
         api_key=key,
         )
 
-    prompt = create_prompt(instance, language=language, codeLanguage=codeLanguage)
+    prompt = create_prompt(instance, history, language=language, codeLanguage=codeLanguage)
 
     response = query_openai(
                 model,
